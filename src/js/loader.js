@@ -1,109 +1,121 @@
 var __loader = (function() {
+    var packages = {};
+    var packagesLinenoOrder = [{ filename: 'loader.js', lineno: 0 }];
+    var extpaths = ['?', '?.js', '?.json', '?/index.js'];
+    var paths = ['/', 'pebble', 'pebble/lib', 'pebble/vendor'];
 
-var loader = {};
+    return {
+        require: require,
+        define: define,
+        getPackageByLineno: getPackageByLineno
+    };
 
-loader.packages = {};
+    /* public */
+    function require(path, requirer) {
+        var module = getPackage(path, requirer);
 
-loader.packagesLinenoOrder = [{ filename: 'loader.js', lineno: 0 }];
+        if (!module) {
+            throw new Error('Cannot find module "' + path + '"');
+        }
 
-loader.extpaths = ['?', '?.js', '?.json', '?/index.js'];
+        if (module.exports) {
+            return module.exports;
+        }
 
-loader.paths = ['/', 'lib', 'vendor'];
+        var loadRequire = function(path) {
+            return require(path, module);
+        };
 
-loader.basepath = function(path) {
-  return path.replace(/[^\/]*$/, '');
-};
+        module.exports = {};
+        module.loader(module.exports, module, loadRequire);
+        module.loaded = true;
 
-var replace = function(a, regexp, b) {
-  var z;
-  do {
-    z = a;
-  } while (z !== (a = a.replace(regexp, b)));
-  return z;
-};
-
-loader.normalize = function(path) {
-  path = replace(path, /(?:(^|\/)\.?\/)+/g, '$1');
-  path = replace(path, /[^\/]*\/\.\.\//, '');
-  return path;
-};
-
-loader.require = function(path, requirer) {
-  var module = loader.getPackage(path, requirer);
-  if (!module) {
-    throw new Error("Cannot find module '" + path + "'");
-  }
-
-  if (module.exports) {
-    return module.exports;
-  }
-
-  var require = function(path) { return loader.require(path, module); };
-
-  module.exports = {};
-  module.loader(module.exports, module, require);
-  module.loaded = true;
-
-  return module.exports;
-};
-
-var compareLineno = function(a, b) { return a.lineno - b.lineno; };
-
-loader.define = function(path, lineno, loadfun) {
-  var module = {
-    filename: path,
-    lineno: lineno,
-    loader: loadfun,
-  };
-
-  loader.packages[path] = module;
-  loader.packagesLinenoOrder.push(module);
-  loader.packagesLinenoOrder.sort(compareLineno);
-};
-
-loader.getPackage = function(path, requirer) {
-  var module;
-  if (requirer) {
-    module = loader.getPackageAtPath(loader.basepath(requirer.filename) + '/' + path);
-  }
-
-  if (!module) {
-    module = loader.getPackageAtPath(path);
-  }
-
-  var paths = loader.paths;
-  for (var i = 0, ii = paths.length; !module && i < ii; ++i) {
-    var dirpath = paths[i];
-    module = loader.getPackageAtPath(dirpath + '/' + path);
-  }
-  return module;
-};
-
-loader.getPackageAtPath = function(path) {
-  path = loader.normalize(path);
-
-  var module;
-  var extpaths = loader.extpaths;
-  for (var i = 0, ii = extpaths.length; !module && i < ii; ++i) {
-    var filepath = extpaths[i].replace('?', path);
-    module = loader.packages[filepath];
-  }
-  return module;
-};
-
-loader.getPackageByLineno = function(lineno) {
-  var packages = loader.packagesLinenoOrder;
-  var module;
-  for (var i = 0, ii = packages.length; i < ii; ++i) {
-    var next = packages[i];
-    if (next.lineno > lineno) {
-      break;
+        return module.exports;
     }
-    module = next;
-  }
-  return module;
-};
 
-return loader;
+    function define(path, lineno, loadfun) {
+        var module = {
+            filename: path,
+            lineno: lineno,
+            loader: loadfun
+        };
 
+        packages[path] = module;
+        packagesLinenoOrder.push(module);
+        packagesLinenoOrder.sort(compareLineno);
+    }
+
+    /* helper */
+    function getPackage(path, requirer) {
+        var module;
+        if (requirer) {
+            module = getPackageAtPath(basepath(requirer.filename) + '/' + path);
+        }
+
+        if (!module) {
+            module = getPackageAtPath(path);
+        }
+
+        for (var i = 0, ii = paths.length; !module && i < ii; ++i) {
+            var dirpath = paths[i];
+            module = getPackageAtPath(dirpath + '/' + path);
+        }
+
+        return module;
+    }
+
+    function getPackageAtPath(path) {
+        var module;
+
+        path = normalize(path);
+
+        for (var i = 0, ii = extpaths.length; !module && i < ii; ++i) {
+            var filepath = extpaths[i].replace('?', path);
+            module = packages[filepath];
+        }
+
+        return module;
+    }
+
+    function getPackageByLineno(lineno) {
+        var packages = packagesLinenoOrder;
+        var module;
+
+        for (var i = 0, ii = packages.length; i < ii; ++i) {
+            var next = packages[i];
+
+            if (next.lineno > lineno) {
+                break;
+            }
+
+            module = next;
+        }
+
+        return module;
+    }
+
+    function basepath(path) {
+        return path.replace(/[^\/]*$/, '');
+    }
+
+    function normalize(path) {
+        path = replace(path, /(?:(^|\/)\.?\/)+/g, '$1');
+        path = replace(path, /[^\/]*\/\.\.\//, '');
+
+        return path;
+    }
+
+    function replace(a, regexp, b) {
+        var z;
+
+        do {
+            z = a;
+        } while (z !== (a = a.replace(regexp, b)));
+
+        return z;
+    }
+
+    function compareLineno(a, b) {
+        return a.lineno - b.lineno;
+    }
 })();

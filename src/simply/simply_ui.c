@@ -45,11 +45,11 @@ static SimplyStyle STYLES[] = {
     .subtitle_font = FONT_KEY_GOTHIC_28,
     .body_font = FONT_KEY_GOTHIC_24_BOLD,
   },
-  [SimplyStyleId_Mono] = {
+/*  [SimplyStyleId_Mono] = {
     .title_font = FONT_KEY_GOTHIC_24_BOLD,
     .subtitle_font = FONT_KEY_GOTHIC_18_BOLD,
     .custom_body_font_id = RESOURCE_ID_MONO_FONT_14,
-  },
+},*/
 };
 
 typedef struct CardClearPacket CardClearPacket;

@@ -25,7 +25,7 @@ Pebble.js applications run on your phone. They have access to all the resources 
 
    This option allows you to customize Pebble.js. Follow the [Pebble SDK installation instructions](https://developer.pebble.com/sdk/install/) to install the SDK on your computer and [fork this project](http://github.com/pebble/pebblejs) on Github. 
    
-   The main entry point for your application is in the `src/js/app.js` file.
+   The main entry point for your application is in the `src/js/app.js` file. For projects with multiple files, you may move `src/js/app.js` to `src/js/app/index.js` instead and create new files under `src/js/app`.
 
    [Install the Pebble SDK on your computer >](http://developer.pebble.com/sdk/install/)
 
@@ -147,16 +147,6 @@ var textfield = new UI.Text({
 wind.add(textfield);
 wind.show();
 ````
-
-## Examples
-
-Coming Soon!
-
-## Acknowledgements
-
-Pebble.js started as [Simply.JS](http://simplyjs.io), a project by [Meiguro](http://github.com/meiguro). It is now part of the Pebble SDK and supported by Pebble. Contact [devsupport@getpebble.com](mailto:devsupport@getpebble.com) with any questions!
-
-This documentation uses [Flatdoc](http://ricostacruz.com/flatdoc/#flatdoc).
 
 # API Reference
 
@@ -409,14 +399,6 @@ You can use the accelerometer in two different ways:
 var Accel = require('ui/accel');
 ````
 
-#### Accel.init()
-
-Before you can use the accelerometer, you must call `Accel.init()`.
-
-````js
-Accel.init();
-````
-
 #### Accel.config(accelConfig)
 
 This function configures the accelerometer `data` events to your liking. The `tap` event requires no configuration for use. Configuring the accelerometer is a very error prone process, so it is recommended to not configure the accelerometer and use `data` events with the default configuration without calling `Accel.config`.
@@ -495,6 +477,45 @@ wind.on('accelData', function(e) {
  console.log('Accel data: ' + JSON.stringify(e.accels));
 });
 ````
+
+### Voice
+
+The `Voice` module allows you to interact with Pebble's dictation API on supported platforms (Basalt and Chalk).
+
+````js
+var Voice = require('ui/voice');
+````
+
+#### Voice.dictate('start', [confirmDialog,] callback)
+
+This function starts the dictation UI, and invokes the callback upon completion. The callback is passed an event with the following fields:
+
+* `err`: A string describing the error, or `null` on success.
+* `transcription`: The transcribed string.
+
+An optional second parameter, `confirmDialog`, can be passed to the `Voice.dictate` method to control whether there should be a confirmation dialog displaying the transcription text after voice input. If `confirmDialog` is set to `false`, the confirmation dialog will be skipped. By default, there will be a confirmation dialog.
+
+```js
+// Start a diction session and skip confirmation
+Voice.dictate('start', false, function(e) {
+  if (e.err) {
+    console.log('Error: ' + e.err);
+    return;
+  }
+
+  main.subtitle('Success: ' + e.transcription);
+});
+```
+
+**NOTE:** Only one dictation session can be active at any time. Trying to call `Voice.dicate('start', ...)` while another dictation session is in progress will result in the callback being called with an event having the error `"sessionAlreadyInProgress"`.
+
+#### Voice.dictate('stop')
+
+This function stops a dictation session that is currently in progress and prevents the session's callback from being invoked. If no session is in progress this method has no effect.
+
+```js
+Voice.dictate('stop');
+```
 
 ### Window
 
@@ -773,6 +794,32 @@ menu.item(0, 0, { title: 'A new item', subtitle: 'replacing the previous one' })
 ````
 
 When called with no `item`, returns the item at the given `sectionIndex` and `itemIndex`.
+
+#### Menu.selection(callback)
+
+Get the currently selected item and section. The callback function will be passed an event with the following fields:
+
+* `menu`: The menu object.
+* `section`: The menu section object.
+* `sectionIndex`: The section index of the section of the selected item.
+* `item`: The menu item object.
+* `itemIndex`: The item index of the selected item.
+
+````js
+menu.selection(function(e) {
+  console.log('Currently selected item is #' + e.itemIndex + ' of section #' + e.sectionIndex);
+  console.log('The item is titled "' + e.item.title + '"');
+});
+````
+
+#### Menu.selection(sectionIndex, itemIndex)
+
+Change the selected item and section.
+
+````js
+// Set the menu selection to the first section's third menu item
+menu.selection(0, 2);
+````
 
 <a id="menu-on-select-callback"></a>
 #### Menu.on('select', callback)
@@ -1131,7 +1178,7 @@ Note that this means you may have to move portions of your startup logic into th
 
 ## Wakeup
 
-The Wakeup module allows you to schedule your app to wakeup at a specified time using Pebble's wakeup functionality. Whether the user is in a watchface or in a different app, your app while launch by the specified time. This allows you to write a custom alarm app, for example. With the Wakeup module, you can save data to be read on launch and configure your app to behave differently based on launch data. The Wakeup module, like the Settings module, is backed by localStorage.
+The Wakeup module allows you to schedule your app to wakeup at a specified time using Pebble's wakeup functionality. Whether the user is in a different watchface or app, your app while launch by the specified time. This allows you to write a custom alarm app, for example. If your app is already running, you may also subscribe to receive the wakeup event, which can be useful for more longer lived timers. With the Wakeup module, you can save data to be read on launch and configure your app to behave differently based on launch data. The Wakeup module, like the Settings module, is backed by localStorage.
 
 ### Wakeup
 
@@ -1202,6 +1249,8 @@ Finally, there are multiple reasons why setting a wakeup event can fail. When a 
 
 If you wish to change the behavior of your app depending on whether it was launched by a wakeup event, and further configure the behavior based on the data associated with the wakeup event, use `Wakeup.launch` on startup. `Wakeup.launch` will immediately call your launch callback asynchronously with a launch event detailing whether or not your app was launched by a wakeup event.
 
+If you require knowing when a wakeup event occurs while your app is already running, refer to [Wakeup.on('wakeup')] to register a wakeup callback that will be called for both launch wakeup events and wakeup events while already running.
+
 ````js
 // Query whether we were launched by a wakeup event
 Wakeup.launch(function(e) {
@@ -1218,11 +1267,56 @@ The `callback` will be called with a wakeup launch event. The event has the foll
 | Name             | Type    | Description   |
 | ----             | :----:  | ------------- |
 | `id`             | number  | If woken by a wakeup event, the wakeup event id. |
-| `wakeup`         | boolean | `true` if the app woke up by a wakeup event, otherwise `false`. |
+| `wakeup`         | boolean | `true` if the launch event is a wakeup event, otherwise `false`. |
+| `launch`         | boolean | `true` if the launch was caused by this wakeup event, otherwise `false`. |
 | `data`           | number  | If woken by a wakeup event, the custom `data` that was associated with the wakeup event. |
 | `cookie`         | number  | If woken by a wakeup event, the custom 32-bit unsigned integer `cookie` that was associated with the wakeup event. |
 
-Note that this means you may have to move portions of your startup logic into the `Wakeup.launch` callback or a function called by the callback. This can also add a very small delay to startup behavior because the underlying implementation must query the watch for the launch information.
+**Note:** You may have to move portions of your startup logic into the `Wakeup.launch` callback or a function called by the callback. This can also add a very small delay to startup behavior because the underlying implementation must query the watch for the launch information.
+
+<a id="wakeup-on-wakeup"></a>
+#### Wakeup.on('wakeup', handler)
+[Wakeup.on('wakeup')]: #wakeup-on-wakeup
+
+Registers a handler to call when a wakeup event occurs. This includes launch wakeup events and wakeup events while already running. See [Wakeup.launch] for the properties of the wakeup event object to be passed to the handler.
+
+````js
+// Single wakeup event handler example:
+Wakeup.on('wakeup', function(e) {
+  console.log('Wakeup event! ' + JSON.stringify(e));
+});
+````
+
+If you want your wakeup handler to only receive wakeup events while already running, you can either test against the `.launch` boolean property, or use a wakeup launch handler to block the event from being sent to additional handlers. Wakeup events are sent to launch wakeup handlers first, then to general wakeup handlers next.
+
+````js
+// Single already-running example:
+Wakeup.on('wakeup', function(e) {
+  if (!e.launch) {
+    console.log('Already-running wakeup: ' + JSON.stringify(e));
+  }
+});
+````
+
+**Note:** Returning false will also prevent further handlers of the same type from receiving the event.  Within each type of handlers, they are passed in registration order. The passing process ends if any handler returns false.
+
+````js
+// Launch + Already-running example:
+// Launch wakeup handler
+Wakeup.launch(function(e) {
+  if (e.wakeup) {
+    console.log('Launch wakeup: ' + JSON.stringify(e));
+  }
+  // Do not pass the event to additional handlers
+  return false;
+});
+
+// Since the launch wakeup handler returns false,
+// this becomes an already-running wakeup handler
+Wakeup.on('wakeup', function(e) {
+  console.log('Wakeup: ' + JSON.stringify(e));
+});
+````
 
 <a id="wakeup-get"></a>
 #### Wakeup.get(id)
@@ -1340,3 +1434,13 @@ For more information, see [Vector2 in the three.js reference documentation][thre
 [Text]: #text
 [TimeText]: #timetext
 [three.js Vector2]: http://threejs.org/docs/#Reference/Math/Vector2
+
+## Examples
+
+Coming Soon!
+
+## Acknowledgements
+
+Pebble.js started as [Simply.JS](http://simplyjs.io), a project by [Meiguro](http://github.com/meiguro). It is now part of the Pebble SDK and supported by Pebble. Contact [devsupport@getpebble.com](mailto:devsupport@getpebble.com) with any questions!
+
+This documentation uses [Flatdoc](http://ricostacruz.com/flatdoc/#flatdoc).
